@@ -5,6 +5,8 @@ body {
     line-height: 1.5;
     padding: 1em 2em;
     padding-bottom:100px;
+    background-color: rgb(36, 36, 36);
+    color:white;
 }
 
 h1, h2, h3, h4, h5, h6, {
