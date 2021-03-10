@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8">
+        <link rel="Shortcut Icon" type="image/x-icon" href="/favicon.ico">
+        <title>$comic_name Chapters!</title>
+        <link rel="stylesheet" href="/css/style.css">
+    </head>
+    <body>
+        <h1>$comic_name Chapters!</h1>
+        <hr>
+        $(
+            cd ./app/comics/$comic_name
+            counter=0
+            for chapter in *
+            do
+                counter=$((counter+1))
+                echo "<div><a href='/comics/$comic_name/$counter'>$chapter</a></div>"
+            done
+        )
+    </body>
+</html>

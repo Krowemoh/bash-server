@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8">
+        <link rel="Shortcut Icon" type="image/x-icon" href="/favicon.ico">
+        <title>Directory - Comic Book Readers Club!</title>
+        <link rel="stylesheet" href="/css/style.css">
+    </head>
+    <body>
+        <h1>Directory - Comic Book Readers Club!</h1>
+        <hr>
+        $(
+            cd ./app/comics
+            for id in *
+            do
+            echo "<div><a href='/comics/$id'>$id</a></div>"
+            done
+        )
+    </body>
+</html>

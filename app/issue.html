@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8">
+        <link rel="Shortcut Icon" type="image/x-icon" href="/favicon.ico">
+        <title>$comic_name - Issue $issue_number</title>
+        <link rel="stylesheet" href="/css/style.css">
+        <script type="text/javascript" src="/js/issue.js"></script>
+    </head>
+
+    <body>
+        <h1>$comic_name - Issue $issue_number</h1>
+        <div id="command-center" style="display:none;">
+            <input type="text" name="page" id="page">
+            <br>
+            <textarea name="notes" id="notes"></textarea>
+        </div>
+        <hr>
+        $(
+            files=(./app/comics/"$comic_name"/*)
+            folder=("${files["$issue_number-1"]}"/*)
+
+            counter=0
+            for page in ${folder[@]}
+            do
+                counter=$((counter+1))
+                page=$(echo "$page" | sed 's/\.\/app//g')
+                if [[ "$counter" -le 3 ]]
+                then
+                    echo "<div><img src='$page' height=1400></div>"
+                else
+                    echo "<div><img realsrc='$page' height=1400></div>"
+                fi
+            done
+        )
+    </body>
+</html>

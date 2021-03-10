@@ -7,16 +7,26 @@ declare -r CR_LF="${CR}${LF}"
 declare -r DEBUG=1
 
 declare -A function_dictionary=(
-    [is_file]=is_file
     [login]=login
+    ["^comics$"]=comics
+    ["^comics/(.*)"]=issues
+    ["^comics/(.*)/(.*)"]=issue
 )
 
 serve() {
-    nc --listen --keep-open --wait 1 0.0.0.0 7999 --sh-exec "./server.sh process"
+    nc --listen --keep-open 0.0.0.0 7999 --sh-exec "./server.sh process"
 }
 
 log() {
     if [ $DEBUG = 1 ]; then echo "$1" >&2; fi
+}
+
+check_session() {
+    if [ ! -f "./sessions/$session_id" ]
+    then
+        render_template "./app/login.html"
+        send_html "$template"
+    fi
 }
 
 process() {
@@ -25,8 +35,8 @@ process() {
     # STDIN -> request_headers
     get_request_headers
 
-    # request_headers -> request_type, request_body
-    get_request_body
+    # request_headers -> request_type, request_body, request_cookies
+    get_request_body_cookies
 
     # request_headers -> requested_resource
     handle_requested_resource
@@ -48,35 +58,54 @@ get_request_headers() {
     done
 }
 
-get_request_body() {
+get_request_body_cookies() {
     request_type="$(echo "${request_headers[0]}" | cut -d" " -f1)"
-    if [ "$request_type" = "POST" ]
-    then
-        post_length=0
-        for i in "${request_headers[@]}"
-        do
-            header=$(cut -d":" -f1 <<< "$i")
-            if [ "$header" = "Content-Length" ]
-            then
-                post_length=$(echo "$i" | cut -d":" -f2 | tr -d "$CR" | tr -d "$LF" | tr -d ' ')
-                break
-            fi
-        done
 
+    post_length=0
+    for i in "${request_headers[@]}"
+    do
+        header=$(cut -d":" -f1 <<< "$i")
+        if [ "$header" = "Content-Length" ]
+        then
+            post_length=$(echo "$i" | cut -d":" -f2 | tr -d "$CR" | tr -d "$LF" | tr -d ' ')
+
+        elif [ "$header" = "Cookie" ]
+        then
+            regex=".*session_id=(.*);"
+            [[ "$i" =~ $regex ]]
+            session_id=${BASH_REMATCH[1]}
+        fi
+    done
+
+    if [ $post_length -ne 0 ] 
+    then
         IFS= read -n "$post_length" request_body  
     fi
 }
 
 handle_requested_resource() {
-    resource="$(echo "${request_headers[0]}" | cut -d" " -f2)"
+
+    regexp=".* (.*) HTTP"
+    [[ "${request_headers[0]}" =~ $regexp ]]
+
+    resource=$(printf "%s" "${BASH_REMATCH[1]}" | sed 's/%20/ /g')
 
     requested_resource="./app$resource"
     if [ -f "$requested_resource" ]
     then
-        ${function_dictionary["is_file"]}
+        send_file "$requested_resource"
     fi
 
     requested_resource="${resource:1}"
+
+    for x in ${!function_dictionary[@]} 
+    do
+        if [[ "$requested_resource" =~ $x ]]
+        then
+            ${function_dictionary[$x]}
+        fi
+    done
+
     if [ ${function_dictionary["$requested_resource"]+_} ]
     then
         ${function_dictionary["$requested_resource"]}
@@ -137,7 +166,13 @@ set_response_headers() {
     version="HTTP/1.1 200 OK"
     date="Date: $(date)"
     connection="Connection: Closed"
-    response_headers="${version}$CR_LF${date}$CR_LF$1$CR_LF$2$CR_LF${connection}"
+
+    if [ "$cookies" = "" ]
+    then
+        response_headers="${version}$CR_LF${date}$CR_LF$1$CR_LF$2$CR_LF${connection}"
+    else
+        response_headers="${version}$CR_LF${date}$CR_LF${cookies}$CR_LF$1$CR_LF$2$CR_LF${connection}"
+    fi
 }
 
 build_response() {
@@ -156,13 +191,14 @@ send_response() {
     fi
 }
 
-is_file() {
+send_file() {
     # -> content_type, escape
+    requested_resource="$1"
     extension="${requested_resource##*.}"
     set_response_content_type "$extension"
 
     # -> data | ESCAPED data, content_length
-    get_requested_content "$escape" "$requested_resource"
+    get_requested_content "$escape" "$1"
 
     # -> response_headers
     set_response_headers  "$content_type" "$content_length"
@@ -185,21 +221,54 @@ send_html() {
     send_response false "$response"
 }
 
+render_template() {
+    template=$(eval "cat <<- END
+    $(cat $1)
+END
+")
+}
+
 login() {
     if [ "$request_type" = "GET" ]
     then
-        requested_resource="./app/login.html"
-        is_file
+        TEST="123"
+        content="$(cat ./app/login.html)"
+        send_html "$content"
 
     else
         username=$(echo -n $request_body | cut -d'&' -f1 | cut -d'=' -f2)
         password=$(echo -n $request_body | cut -d'&' -f2 | cut -d'=' -f2)
 
-        log "$username trying to log in with $password"
-
-        content="<h1>hello, $username!</h1>"
-        send_html "$content"
+        if [ "$password" = "123" ]
+        then
+            session_id=$(uuidgen)
+            touch "./sessions/$session_id"
+            cookies="Set-cookie: session_id=$session_id"
+        fi
+        render_template "./app/comics.html"
+        send_html "$template"
     fi
+}
+
+comics() {
+    check_session
+    render_template "./app/comics.html"
+    send_html "$template"
+}
+
+issues() {
+    check_session
+    comic_name="${BASH_REMATCH[1]}"
+    render_template "./app/issues.html"
+    send_html "$template"
+}
+
+issue() {
+    check_session
+    comic_name="${BASH_REMATCH[1]}"
+    issue_number="${BASH_REMATCH[2]}"
+    render_template "./app/issue.html"
+    send_html "$template"
 }
 
 "$@"
