@@ -20,6 +20,11 @@
             files=(./app/comics/"$comic_name"/*)
             folder=("${files["$issue_number-1"]}"/*)
 
+            if [ -d ${folder} ]
+            then
+                folder=("${folder}"/*)
+            fi
+
             counter=0
             for page in ${folder[@]}
             do

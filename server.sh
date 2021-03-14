@@ -8,6 +8,7 @@ declare -r DEBUG=1
 
 declare -A function_dictionary=(
     [login]=login
+    [signout]=signout
     ["^comics$"]=comics
     ["^comics/(.*)"]=issues
     ["^comics/(.*)/(.*)"]=issue
@@ -18,7 +19,10 @@ serve() {
 }
 
 log() {
-    if [ $DEBUG = 1 ]; then echo "$1" >&2; fi
+    if [ $DEBUG = 1 ]
+    then 
+        echo "$1" >&2; 
+    fi
 }
 
 check_session() {
@@ -49,7 +53,7 @@ get_request_headers() {
 
     while true
     do
-        read -a header
+        read header
         if [ "$header" = $CR_LF ]
         then
             break
@@ -71,13 +75,13 @@ get_request_body_cookies() {
 
         elif [ "$header" = "Cookie" ]
         then
-            regex=".*session_id=(.*);"
+            regex=".*session_id=(.*);?"
             [[ "$i" =~ $regex ]]
-            session_id=${BASH_REMATCH[1]}
+            session_id=$(echo "${BASH_REMATCH[1]}" |  tr -d "$CR" | tr -d "$LF")
         fi
     done
 
-    if [ $post_length -ne 0 ] 
+    if [ "$post_length" -ne 0 ] 
     then
         IFS= read -n "$post_length" request_body  
     fi
@@ -98,7 +102,7 @@ handle_requested_resource() {
 
     requested_resource="${resource:1}"
 
-    for x in ${!function_dictionary[@]} 
+    for x in "${!function_dictionary[@]}"
     do
         if [[ "$requested_resource" =~ $x ]]
         then
@@ -182,7 +186,7 @@ build_response() {
 send_response() {
     if [[ $1 = true ]]
     then
-        printf "$2"
+        printf -- "$2"
         exit
 
     else
@@ -223,7 +227,7 @@ send_html() {
 
 render_template() {
     template=$(eval "cat <<- END
-    $(cat $1)
+    $(cat "$1")
 END
 ")
 }
@@ -231,13 +235,12 @@ END
 login() {
     if [ "$request_type" = "GET" ]
     then
-        TEST="123"
         content="$(cat ./app/login.html)"
         send_html "$content"
 
     else
-        username=$(echo -n $request_body | cut -d'&' -f1 | cut -d'=' -f2)
-        password=$(echo -n $request_body | cut -d'&' -f2 | cut -d'=' -f2)
+        username=$(echo -n "$request_body" | cut -d'&' -f1 | cut -d'=' -f2)
+        password=$(echo -n "$request_body" | cut -d'&' -f2 | cut -d'=' -f2)
 
         if [ "$password" = "123" ]
         then
@@ -245,9 +248,20 @@ login() {
             touch "./sessions/$session_id"
             cookies="Set-cookie: session_id=$session_id"
         fi
-        render_template "./app/comics.html"
+        render_template "./app/account.html"
         send_html "$template"
     fi
+}
+
+signout() {
+    if [ -f "./sessions/$session_id" ]
+    then
+        rm "./sessions/$session_id"
+        session_id=""
+        cookies="Set-cookie: session_id=$session_id"
+    fi
+    render_template "./app/login.html"
+    send_html "$template"
 }
 
 comics() {
@@ -271,4 +285,4 @@ issue() {
     send_html "$template"
 }
 
-"$@"
+"$1"
