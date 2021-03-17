@@ -88,7 +88,6 @@ get_request_body_cookies() {
 }
 
 handle_requested_resource() {
-
     regexp=".* (.*) HTTP"
     [[ "${request_headers[0]}" =~ $regexp ]]
 
@@ -110,20 +109,11 @@ handle_requested_resource() {
         fi
     done
 
-    if [ ${function_dictionary["$requested_resource"]+_} ]
-    then
-        ${function_dictionary["$requested_resource"]}
-
-    else
-        version="HTTP/1.1 404 NOT FOUND"
-        requested_resource="./app/404.html"
-        ${function_dictionary["default"]}
-    fi
+    render_template "./app/404.html"
+    send_html "$template"
 }
 
 set_response_content_type() {
-    escape=false
-
     case "$1" in
         "html")
             content_type="Content-Type: text/html"
@@ -136,19 +126,15 @@ set_response_content_type() {
             ;;
         "ico")
             content_type="Content-Type: image/x-icon"
-            escape=true
             ;;
         "png")
             content_type="Content-Type: image/png"
-            escape=true
             ;;
         "jpg" | "jpeg")
             content_type="Content-Type: image/jpeg"
-            escape=true
             ;;
         "mp4")
             content_type="Content-Type: video/mp4"
-            escape=true
             ;;
         *)
             content_type="Content-Type: text/plain"
@@ -157,13 +143,9 @@ set_response_content_type() {
 }
 
 get_requested_content() {
-    if [[ "$1" = true ]]
-    then
-        content=$(cat "$2" | sed 's/\\/\\\\/g' | sed 's/%/%%/g' | sed 's/\x00/\\x00/g')
-    else
-        content=$(cat "$2")
-    fi
-    content_length="Content-Length: ${#content})"
+    length=$(stat --printf "%s" "$1")
+    content_length="Content-Length: $length"
+    content=$(cat "$1" | sed 's/\\/\\\\/g' | sed 's/%/%%/g' | sed 's/\x00/\\x00/g')
 }
 
 set_response_headers() {
@@ -184,25 +166,18 @@ build_response() {
 }
 
 send_response() {
-    if [[ $1 = true ]]
-    then
-        printf -- "$2"
-        exit
-
-    else
-        echo "$2"
-        exit
-    fi
+    printf -- "$1$CR_LF"
+    exit
 }
 
 send_file() {
-    # -> content_type, escape
+    # -> content_type
     requested_resource="$1"
     extension="${requested_resource##*.}"
     set_response_content_type "$extension"
 
-    # -> data | ESCAPED data, content_length
-    get_requested_content "$escape" "$1"
+    # -> data | content_length
+    get_requested_content "$1"
 
     # -> response_headers
     set_response_headers  "$content_type" "$content_length"
@@ -211,7 +186,7 @@ send_file() {
     build_response "$response_headers" "$content"
 
     # -> ECHO data | PRINTF data 
-    send_response "$escape" "$response"
+    send_response "$response"
 }
 
 send_html() {
@@ -222,7 +197,7 @@ send_html() {
     set_response_headers "$content_type" "$content_length"
     build_response "$response_headers" "$content"
 
-    send_response false "$response"
+    send_response "$response"
 }
 
 render_template() {

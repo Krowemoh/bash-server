@@ -18,4 +18,3 @@ refresh_handler = function(e) {
 window.addEventListener('scroll', refresh_handler);
 window.addEventListener('load', refresh_handler);
 window.addEventListener('resize', refresh_handler);
-
