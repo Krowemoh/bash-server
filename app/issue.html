@@ -29,7 +29,7 @@
             for page in ${folder[@]}
             do
                 counter=$((counter+1))
-                page=$(echo "$page" | sed 's/\.\/app//g')
+                page=$(echo "$page" | sed 's/\.\/app//g' | sed "s/'/%%27/g")
                 if [[ "$counter" -le 3 ]]
                 then
                     echo "<div><img src='$page' height=1400></div>"

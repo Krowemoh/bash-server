@@ -34,7 +34,7 @@ check_session() {
 }
 
 process() {
-    IFS=$'\n' 
+    local IFS=$'\n' 
 
     # STDIN -> request_headers
     get_request_headers
@@ -44,8 +44,6 @@ process() {
 
     # request_headers -> requested_resource
     handle_requested_resource
-
-    unset IFS
 }
 
 get_request_headers() {
@@ -91,7 +89,7 @@ handle_requested_resource() {
     regexp=".* (.*) HTTP"
     [[ "${request_headers[0]}" =~ $regexp ]]
 
-    resource=$(printf "%s" "${BASH_REMATCH[1]}" | sed 's/%20/ /g')
+    resource=$(printf "%s" "${BASH_REMATCH[1]}" | sed 's/%20/ /g' | sed "s/%27/'/g")
 
     requested_resource="./app$resource"
     if [ -f "$requested_resource" ]

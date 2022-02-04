@@ -35,6 +35,7 @@ ol {
 }
 img {
     max-width:80ch;
+    height:auto;
 }
 
 video {
